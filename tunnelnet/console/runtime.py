@@ -11,9 +11,10 @@ from tunnelnet.env import Environment
 from tunnelnet.fire import FireService
 from tunnelnet.ns import Registry as NamespaceRegistry
 from tunnelnet.patrol import PatrolService
+from tunnelnet.protect import ProtectService
 from tunnelnet.quota import QuotaService
 from tunnelnet.store import Store
-from tunnelnet.vent import VentService
+from tunnelnet.vent import FanBank, VentService
 
 DEFAULT_ZONES = ("zone-1", "zone-2", "zone-3")
 DEFAULT_THRESHOLD = 75.0
