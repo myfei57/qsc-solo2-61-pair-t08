@@ -73,7 +73,7 @@ def collect(rt: "Runtime") -> Telemetry:
         cabins=rt.cabins.count(),
         active_cabins=rt.cabins.active_count(),
         cables=rt.cables.count(),
-        cable_danger=danger_count(rt.cables, 75.0),
+        cable_danger=danger_count(rt.cables),
         pits=rt.drain.pit_count(),
         high_pits=rt.drain.high_count(),
         cycles=rt.drain.cycle_count(),

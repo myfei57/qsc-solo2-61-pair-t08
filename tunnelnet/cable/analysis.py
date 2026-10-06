@@ -2,15 +2,22 @@
 
 from __future__ import annotations
 
+from .model import TemperaturePolicy
 from .registry import CableRegistry
 
 
-def danger_count(registry: CableRegistry, threshold: float) -> int:
-    return sum(1 for temp in registry.temperatures() if temp >= threshold)
+def danger_count(
+    registry: CableRegistry, policy: TemperaturePolicy | None = None
+) -> int:
+    rule = registry.policy() if policy is None else policy
+    return sum(1 for temp in registry.temperatures() if rule.is_over(temp))
 
 
-def healthy_count(registry: CableRegistry, threshold: float) -> int:
-    return sum(1 for temp in registry.temperatures() if temp < threshold)
+def healthy_count(
+    registry: CableRegistry, policy: TemperaturePolicy | None = None
+) -> int:
+    rule = registry.policy() if policy is None else policy
+    return sum(1 for temp in registry.temperatures() if not rule.is_over(temp))
 
 
 def load_factor(registry: CableRegistry) -> float:

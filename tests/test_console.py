@@ -76,6 +76,7 @@ class ConsoleCase(unittest.TestCase):
                 "patrol",
                 "quota",
                 "cables",
+                "protection",
                 "suppression",
                 "audit",
             },
@@ -460,6 +461,62 @@ class ConsoleCase(unittest.TestCase):
         self.assertEqual(health["danger"], 1)
         self.assertEqual(health["healthy"], 1)
         self.assertGreater(health["load_factor"], 0)
+        self.assertEqual(health["trip_limit"], 75.0)
+        self.assertEqual(health["restore_limit"], 70.0)
+
+    def test_protection_trip_cooldown_manual_reset(self) -> None:
+        status, report = self.call("GET", "/api/protection")
+        self.assertEqual(status, 200)
+        self.assertEqual(report["active"], 0)
+
+        # Over temperature trips: fan stopped then cabin isolated.
+        status, body = self.call("POST", "/api/cables/temp", {"cable_id": "cable-2", "temp": 90.0})
+        self.assertEqual(body["protection"]["state"], "tripped")
+        status, view = self.call("GET", "/api/protection/state", query={"cable_id": ["cable-2"]})
+        self.assertFalse(view["fan_running"])
+        self.assertTrue(view["cabin_isolated"])
+
+        # Reset is denied until the temperature settles below the restore band.
+        status, body = self.call("POST", "/api/protection/reset", {"cable_id": "cable-2"})
+        self.assertEqual(body["outcome"]["action"], "denied")
+        for _ in range(2):
+            self.call("POST", "/api/cables/temp", {"cable_id": "cable-2", "temp": 60.0})
+        status, body = self.call("POST", "/api/cables/temp", {"cable_id": "cable-2", "temp": 60.0})
+        self.assertEqual(body["protection"]["state"], "ready")
+
+        # Held until a human confirms; repeated reset is then a no-op.
+        status, body = self.call("POST", "/api/protection/reset", {"cable_id": "cable-2"})
+        self.assertEqual(body["outcome"]["action"], "reset")
+        self.assertEqual(body["state"]["state"], "normal")
+        status, body = self.call("POST", "/api/protection/reset", {"cable_id": "cable-2"})
+        self.assertEqual(body["outcome"]["action"], "noop")
+
+        status, audit = self.call("GET", "/api/audit")
+        events = [entry["event"] for entry in audit["items"]]
+        self.assertIn("otp_trip", events)
+        self.assertIn("otp_trip_ref", events)
+        self.assertIn("otp_reset_denied", events)
+        self.assertIn("otp_ready", events)
+        self.assertIn("otp_reset", events)
+
+        status, body = self.call("GET", "/api/protection/state", query={"cable_id": ["ghost"]})
+        self.assertEqual(status, 404)
+        status, body = self.call("POST", "/api/protection/reset", {"cable_id": "ghost"})
+        self.assertEqual(status, 404)
+
+    def test_protection_relatch_on_repeated_over_temperature(self) -> None:
+        self.call("POST", "/api/cables/temp", {"cable_id": "cable-2", "temp": 90.0})
+        for _ in range(3):
+            self.call("POST", "/api/cables/temp", {"cable_id": "cable-2", "temp": 60.0})
+        status, view = self.call("GET", "/api/protection/state", query={"cable_id": ["cable-2"]})
+        self.assertEqual(view["state"], "ready")
+
+        # Back over the trip limit before reset re-latches, still held.
+        status, body = self.call("POST", "/api/cables/temp", {"cable_id": "cable-2", "temp": 90.0})
+        self.assertEqual(body["protection"]["action"], "relatch")
+        self.assertEqual(body["protection"]["state"], "tripped")
+        status, body = self.call("POST", "/api/protection/reset", {"cable_id": "cable-2"})
+        self.assertEqual(body["outcome"]["action"], "denied")
 
     def test_quota_routes(self) -> None:
         status, report = self.call("GET", "/api/quota/report")

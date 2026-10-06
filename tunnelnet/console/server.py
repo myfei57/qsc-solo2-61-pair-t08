@@ -20,6 +20,7 @@ class Server:
 
     def __init__(self, store: Store, web_dir: str = "web") -> None:
         self.runtime = Runtime(store)
+        self.runtime.bind_protection_audit()
         seed_defaults(self.runtime)
         self.web_dir = web_dir
         self.router = Router()

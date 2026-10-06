@@ -562,8 +562,7 @@ def cable_stats(server: "Server", request: Request) -> Response:
     cable_id = request.query_field("id")
     if not cable_id:
         raise RequestError(400, "id is required")
-    threshold = request.query_field("threshold")
-    limit = float(threshold) if threshold else 75.0
+    policy = cables.policy()
     return json_response(
         {
             "id": cable_id,
@@ -571,7 +570,9 @@ def cable_stats(server: "Server", request: Request) -> Response:
             "average": cables.average(cable_id),
             "max": cables.maximum(cable_id),
             "min": cables.minimum(cable_id),
-            "over": cables.over(cable_id, limit),
+            "over": cables.over(cable_id),
+            "trip_limit": policy.trip_limit,
+            "restore_limit": policy.restore_limit,
         }
     )
 
@@ -580,9 +581,11 @@ def cable_health(server: "Server", request: Request) -> Response:
     cables = server.runtime.cables
     return json_response(
         {
-            "danger": danger_count(cables, 75.0),
-            "healthy": healthy_count(cables, 75.0),
+            "danger": danger_count(cables),
+            "healthy": healthy_count(cables),
             "load_factor": load_factor(cables),
+            "trip_limit": cables.policy().trip_limit,
+            "restore_limit": cables.policy().restore_limit,
         }
     )
 
@@ -590,18 +593,47 @@ def cable_health(server: "Server", request: Request) -> Response:
 def cable_temp(server: "Server", request: Request) -> Response:
     cables = server.runtime.cables
     cable_id = request.str_field("cable_id")
-    if not cables.set_temp(cable_id, request.float_field("temp")):
+    temp = request.float_field("temp")
+    if not cables.set_temp(cable_id, temp):
         raise RequestError(404, "cable not found")
+    outcome = server.runtime.protection.evaluate(cable_id, temp)
     state = cables.get(cable_id)
-    return json_response({} if state is None else state.as_dict())
+    body = {} if state is None else state.as_dict()
+    body["protection"] = outcome.as_dict()
+    return json_response(body)
 
 
 def cable_sample(server: "Server", request: Request) -> Response:
     cables = server.runtime.cables
     cable_id = request.str_field("cable_id")
-    if not cables.sample(cable_id, request.float_field("value")):
+    value = request.float_field("value")
+    if not cables.sample(cable_id, value):
         raise RequestError(404, "cable not found")
-    return json_response({"history": cables.history(cable_id)})
+    outcome = server.runtime.protection.evaluate(cable_id, value)
+    return json_response({"history": cables.history(cable_id), "protection": outcome.as_dict()})
+
+
+def protection_list(server: "Server", request: Request) -> Response:
+    return json_response(server.runtime.protection.report().as_dict())
+
+
+def protection_state(server: "Server", request: Request) -> Response:
+    cable_id = request.query_field("cable_id")
+    view = server.runtime.protection.view(cable_id)
+    if view is None:
+        raise RequestError(404, "cable not found")
+    return json_response(view.as_dict())
+
+
+def protection_reset(server: "Server", request: Request) -> Response:
+    cable_id = request.str_field("cable_id")
+    if server.runtime.cables.get(cable_id) is None:
+        raise RequestError(404, "cable not found")
+    outcome = server.runtime.protection.reset(cable_id)
+    view = server.runtime.protection.view(cable_id)
+    return json_response(
+        {"outcome": outcome.as_dict(), "state": None if view is None else view.as_dict()}
+    )
 
 
 def quota_report(server: "Server", request: Request) -> Response:

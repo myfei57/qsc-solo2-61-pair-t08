@@ -588,8 +588,8 @@ class CableCase(unittest.TestCase):
         self.assertEqual(registry.sample_count(), 2)
         self.assertEqual(registry.summary().as_dict(), {"total": 2, "samples": 2})
         self.assertEqual(registry.temperatures(), [60.0, 80.0])
-        self.assertEqual(danger_count(registry, 75.0), 1)
-        self.assertEqual(healthy_count(registry, 75.0), 1)
+        self.assertEqual(danger_count(registry), 1)
+        self.assertEqual(healthy_count(registry), 1)
         self.assertAlmostEqual(load_factor(registry), 70.0)
         self.assertIn("total=2", registry.describe())
 
@@ -608,7 +608,7 @@ class CableCase(unittest.TestCase):
         self.assertEqual(status_for(75.0), "over")
         empty = CableRegistry()
         self.assertEqual(load_factor(empty), 0.0)
-        self.assertEqual(danger_count(empty, 75.0), 0)
+        self.assertEqual(danger_count(empty), 0)
 
 
 class QuotaCase(unittest.TestCase):

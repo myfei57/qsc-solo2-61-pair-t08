@@ -65,6 +65,28 @@ class Registry:
     def close_valve(self, cabin_id: str) -> None:
         self._require(cabin_id).valve_open = False
 
+    def isolate(self, cabin_id: str) -> bool:
+        """Seal one cabin for an over temperature protection and verify it.
+
+        Idempotent: a cabin that is already sealed stays sealed.  Returns the
+        verified sealed state so a failed actuator surfaces as ``False``.
+        """
+
+        cabin = self._require(cabin_id)
+        with self._lock:
+            cabin.door_open = False
+            cabin.valve_open = False
+            return not cabin.door_open and not cabin.valve_open
+
+    def reinstate(self, cabin_id: str) -> bool:
+        """Reverse :meth:`isolate` and verify the cabin is usable again."""
+
+        cabin = self._require(cabin_id)
+        with self._lock:
+            cabin.door_open = True
+            cabin.valve_open = True
+            return cabin.door_open and cabin.valve_open
+
     def valve_state(self, cabin_id: str) -> bool:
         return self._require(cabin_id).valve_open
 

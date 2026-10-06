@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from tunnelnet.audit import Record
 from tunnelnet.drain import utc_now
@@ -22,3 +22,20 @@ def record_event(rt: "Runtime", event: str, ref: str = "") -> list[Record]:
     for entry in entries:
         rt.audit.append(entry)
     return entries
+
+
+class EventSink(Protocol):
+    """Minimal sink used by domain services that raise audit events."""
+
+    def emit(self, event: str, ref: str = "") -> None:  # pragma: no cover - structural
+        ...
+
+
+class AuditSink:
+    """Routes protection events into the shared append only audit registry."""
+
+    def __init__(self, rt: "Runtime") -> None:
+        self._rt = rt
+
+    def emit(self, event: str, ref: str = "") -> None:
+        record_event(self._rt, event, ref)

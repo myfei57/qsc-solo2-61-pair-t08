@@ -63,9 +63,12 @@ def dashboard(rt: "Runtime") -> dict[str, object]:
         "cables": {
             "count": rt.cables.count(),
             "load_factor": load_factor(rt.cables),
-            "danger": danger_count(rt.cables, 75.0),
-            "healthy": healthy_count(rt.cables, 75.0),
+            "danger": danger_count(rt.cables),
+            "healthy": healthy_count(rt.cables),
+            "trip_limit": rt.cables.policy().trip_limit,
+            "restore_limit": rt.cables.policy().restore_limit,
         },
+        "protection": rt.protection.report().as_dict(),
         "drain": {
             "pits": rt.drain.pit_count(),
             "average_level": rt.drain.average_level(),

@@ -62,7 +62,7 @@ def run_checks(rt: "Runtime") -> list[dict[str, str]]:
         }
     )
 
-    danger = danger_count(rt.cables, 75.0)
+    danger = danger_count(rt.cables)
     checks.append(
         {"name": "cables", "status": "warn" if danger else "ok", "detail": f"over temperature={danger}"}
     )

@@ -4,21 +4,25 @@ from __future__ import annotations
 
 import threading
 
-from .model import Cable, status_for
+from .model import DEFAULT_POLICY, Cable, TemperaturePolicy, status_for
 from .report import CableState, CableSummary, cable_state
 
 
 class CableRegistry:
     """Holds cables, their temperature history and derived statistics."""
 
-    def __init__(self) -> None:
+    def __init__(self, policy: TemperaturePolicy = DEFAULT_POLICY) -> None:
         self._items: dict[str, Cable] = {}
         self._history: dict[str, list[float]] = {}
         self._lock = threading.RLock()
+        self._policy = policy
+
+    def policy(self) -> TemperaturePolicy:
+        return self._policy
 
     def add(self, cable: Cable) -> Cable:
         with self._lock:
-            cable.status = status_for(cable.temp)
+            cable.status = status_for(cable.temp, self._policy)
             self._items[cable.id] = cable
             self._history.setdefault(cable.id, [])
             return cable
@@ -36,7 +40,7 @@ class CableRegistry:
             if cable is None:
                 return False
             cable.temp = temp
-            cable.status = status_for(temp)
+            cable.status = status_for(temp, self._policy)
             return True
 
     def list(self) -> list[CableState]:
@@ -71,8 +75,9 @@ class CableRegistry:
         values = self.history(cable_id)
         return min(values) if values else 0.0
 
-    def over(self, cable_id: str, threshold: float) -> int:
-        return sum(1 for value in self.history(cable_id) if value >= threshold)
+    def over(self, cable_id: str, threshold: float | None = None) -> int:
+        limit = self._policy.trip_limit if threshold is None else threshold
+        return sum(1 for value in self.history(cable_id) if value >= limit)
 
     def sample_count(self) -> int:
         with self._lock:

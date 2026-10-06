@@ -25,10 +25,12 @@ def collect(rt: "Runtime") -> dict[str, str]:
         "environment": rt.env.describe(),
         "drain": rt.drain.describe(),
         "ventilation": rt.ventilation.describe(),
+        "fans": rt.fans.describe(),
         "fire": rt.fire.describe(),
         "patrol": rt.patrol.describe(),
         "quota": rt.quota.describe(),
         "cables": rt.cables.describe(),
+        "protection": rt.protection.describe(),
         "suppression": rt.suppression.describe(),
         "audit": rt.audit.describe(),
     }
